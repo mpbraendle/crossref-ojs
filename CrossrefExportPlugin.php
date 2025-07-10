@@ -93,10 +93,67 @@ class CrossrefExportPlugin extends DOIPubIdExportPlugin
     /**
      * @copydoc PubObjectsExportPlugin::getSubmissionFilter()
      */
-    public function getSubmissionFilter()
+    /* UZH CHANGE OJS-222 2025/06/27/mb use output filter depending on COAR type */
+    public function getSubmissionFilter($submission = null)
     {
+        if (is_null($submission)) {
+            return 'article=>crossref-xml';
+        }
+
+        $publication = $submission->getCurrentPublication();
+        if ($publication && $sectionId = $publication->getData('sectionId')) {
+            $section = Repo::section()->get($sectionId);
+            if ($section && $section->getData('resourceType')) {
+                $resourceType = $section->getData('resourceType');
+                $filter = $this->_mapCoarToFilter($resourceType);
+                return $filter;
+            } 
+        } 
         return 'article=>crossref-xml';
     }
+   
+    private function _mapCoarToFilter($uri = null)
+    {
+        $mapResourceTypes = array(
+            'http://purl.org/coar/resource_type/c_6501' => 'article=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_2df8fbb1' => 'article=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_dcae04bc' => 'article=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_b239' => 'article=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_beb9' => 'article=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_7bab' => 'article=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_545b' => 'article=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_0640' => 'article=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_93fc' => 'report-paper=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_efa0' => 'article=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_ba08' => 'article=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_26e4' => 'posted_content=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_8544' => 'posted_content=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_5794' => 'conference_paper=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_6670' => 'posted_content=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_f744' => 'conference_paper=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_c94f' => 'posted_content=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_46ec' => 'dissertation=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_8042' => 'report-paper=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_816b' => 'posted_content=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_3248' => 'book=>crossref-xml',
+            'http://purl.org/coar/resource_type/F8RT-TJK0' => 'posted_content=>crossref-xml',
+            'http://purl.org/coar/resource_type/YC9F-HGCF' => 'posted_content=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_c513' => 'posted_content=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_8a7e' => 'posted_content=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_18cc' => 'posted_content=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_18cd' => 'posted_content=>crossref-xml',
+            'http://purl.org/coar/resource_type/c_1843' => 'article=>crossref-xml'
+        );
+
+        if ($uri && array_key_exists($uri, $mapResourceTypes)) {
+            return $mapResourceTypes[$uri];
+        } else {
+            return 'article=>crossref-xml';
+        }
+    }
+    /* END UZH CHANGE OJS-222 */
+
+
 
     /**
      * @copydoc PubObjectsExportPlugin::getIssueFilter()
@@ -214,9 +271,14 @@ class CrossrefExportPlugin extends DOIPubIdExportPlugin
         // also the filter expects an array of objects.
         // Thus the foreach loop, but every object will be in an one item array for
         // the export and filter to work.
+        // UZH CHANGE OJS-222 2025/06/27/mb use output filter depending on COAR type
         foreach ($objects as $object) {
             // Get the XML
             // Supply an exportErrors array because otherwise exportXML() will echo out export errors
+            // UZH CHANGE OJS-222 2025/06/27/mb use output filter depending on COAR type
+            $filter = $this->getSubmissionFilter($object);
+            
+            // END UZH CHANGE OJS-222
             $exportErrors = [];
             $exportXml = $this->exportXML([$object], $filter, $context, $noValidation, $exportErrors);
             // Write the XML to a file.
@@ -261,6 +323,15 @@ class CrossrefExportPlugin extends DOIPubIdExportPlugin
         $fileManager = new TemporaryFileManager();
 
         $exportErrors = [];
+        // UZH CHANGE OJS-222 2025/06/27/mb use output filter depending on COAR type
+        // only when array size is 1, otherwise create default output
+        if ($filter == 'article=>crossref-xml' && count($objects) == 1) {
+            foreach ($objects as $object) {
+                $filter = $this->getSubmissionFilter($object);
+            }
+        }
+        // END UZH CHANGE OJS-222
+
         $exportXml = $this->exportXML($objects, $filter, $context, $noValidation, $exportErrors);
 
         $exportFileName = $this->getExportFileName($this->getExportPath(), $objectsFileNamePart, $context, '.xml');
